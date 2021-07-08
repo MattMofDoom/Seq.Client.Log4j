@@ -1,5 +1,3 @@
-package com.mattmofdoom.logging.log4j2.seqappender.tests;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.ThreadContext;
