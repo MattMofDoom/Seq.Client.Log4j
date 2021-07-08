@@ -1,11 +1,11 @@
 package com.mattmofdoom.logging.log4j2.seqappender;
 
 import com.google.gson.Gson;
-import org.apache.logging.log4j.ThreadContext;
 import org.apache.logging.log4j.core.Filter;
 import org.apache.logging.log4j.core.Layout;
 import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.Property;
 import org.apache.logging.log4j.core.config.plugins.*;
 import org.apache.logging.log4j.core.config.plugins.validation.constraints.Required;
 
@@ -17,20 +17,25 @@ import java.net.UnknownHostException;
 import java.sql.Timestamp;
 import java.util.*;
 
-@SuppressWarnings("unused")
+@SuppressWarnings({"unused", "LocalCanBeFinal", "UnnecessaryThis", "UnqualifiedStaticUsage"})
 @Plugin(name = "SeqAppender", category = "Core", elementType = "appender", printObject = true)
 public class SeqAppender extends AbstractAppender {
-    private String Host = null;
-    private String Url = "";
-    private String ApiKey = "";
-    private String AppName = "";
+    private String Host;
+    private final String Url;
+    private final String ApiKey;
+    private final String AppName;
+    final Map<String, Object> Properties = new HashMap<>();
 
     protected SeqAppender(String name, Filter filter,
-                          Layout<? extends Serializable> layout, String seqUrl, String seqApiKey, String appName) {
-        super(name, filter, layout);
-        Url = seqUrl;
-        ApiKey = seqApiKey;
-        AppName = appName;
+                          Layout<? extends Serializable> layout, String seqUrl, String seqApiKey, String appName, Property[] properties) {
+        super(name, filter, layout, true, properties);
+        this.Url = seqUrl;
+        this.ApiKey = seqApiKey;
+        this.AppName = appName;
+        for (Property property : properties) {
+            this.Properties.put(property.getName(), property.getValue());
+        }
+
     }
 
     @PluginBuilderFactory
@@ -39,6 +44,7 @@ public class SeqAppender extends AbstractAppender {
     }
 
 
+    @SuppressWarnings({"LocalCanBeFinal", "UnnecessaryThis"})
     public static class SeqAppenderBuilder
             implements org.apache.logging.log4j.core.util.Builder<SeqAppender> {
         @PluginBuilderAttribute("name")
@@ -50,6 +56,9 @@ public class SeqAppender extends AbstractAppender {
 
         @PluginElement("Filter")
         private Filter filter;
+
+        @PluginElement("Properties")
+        private Property[] properties;
 
         @PluginBuilderAttribute("SeqUrl")
         private String seqUrl;
@@ -75,6 +84,12 @@ public class SeqAppender extends AbstractAppender {
             return this;
         }
 
+        public SeqAppenderBuilder setProperties(Property[] value) {
+            this.properties = value;
+            return this;
+        }
+
+
         public SeqAppenderBuilder setSeqUrl(String value) {
             this.seqUrl = value;
             return this;
@@ -92,32 +107,31 @@ public class SeqAppender extends AbstractAppender {
 
         @Override
         public SeqAppender build() {
-            return new SeqAppender(name, filter, layout, seqUrl, seqApiKey, appName);
+            return new SeqAppender(this.name, this.filter, this.layout, this.seqUrl, this.seqApiKey, this.appName, this.properties);
         }
     }
 
     @PluginFactory
     public static SeqAppender createAppender(@PluginAttribute("name") String name,
                                              @PluginElement("Layout") Layout<? extends Serializable> layout,
-                                             @PluginElement("Filters") Filter filter, @PluginAttribute("seqUrl") String seqUrl, @PluginAttribute("seqApiKey") String seqApiKey, @PluginAttribute("appName") String appName) {
+                                             @PluginElement("Filters") Filter filter, @PluginElement("IgnoreExceptions") Boolean ignoreExceptions, @PluginElement("Properties") Property[] properties, @PluginAttribute("seqUrl") String seqUrl, @PluginAttribute("seqApiKey") String seqApiKey, @PluginAttribute("appName") String appName) {
 
-        return new SeqAppender(name, filter, layout, seqUrl, seqApiKey, appName);
+        return new SeqAppender(name, filter, layout, seqUrl, seqApiKey, appName, properties);
     }
 
     @Override
     public void append(LogEvent logEvent) {
         try {
-            URL seqUrl = new URL(Url + "/api/events/raw");
-            String seqApiKey = ApiKey;
+            URL seqUrl = new URL(this.Url + "/api/events/raw");
             HttpURLConnection conn = (HttpURLConnection) seqUrl.openConnection();
             conn.setDoOutput(true);
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("X-Seq-ApiKey", seqApiKey);
+            conn.setRequestProperty("X-Seq-ApiKey", this.ApiKey);
 
             Gson jsonObject = new Gson();
             OutputStream os = conn.getOutputStream();
-            os.write(jsonObject.toJson(getLog(logEvent)).getBytes());
+            os.write(jsonObject.toJson(this.getLog(logEvent)).getBytes());
             os.flush();
 
             if (conn.getResponseCode() != HttpURLConnection.HTTP_CREATED) {
@@ -139,44 +153,45 @@ public class SeqAppender extends AbstractAppender {
 
     private SeqLog getLog(LogEvent logEvent)
     {
-        SeqLog seqLog = new SeqLog();
-        SeqEvents x = new SeqEvents();
-        x.Level = logEvent.getLevel().toString();
-        x.Timestamp = new Timestamp(logEvent.getTimeMillis());
-        Map<String, Object> kv = new Hashtable<>();
-        kv.put("MachineName", getHostname());
-        x.MessageTemplate = logEvent.getMessage().getFormattedMessage();
+        SeqEvents seqEvents = new SeqEvents();
+
+        //Build the basic log event
+        seqEvents.Level = logEvent.getLevel().toString();
+        seqEvents.Timestamp = new Timestamp(logEvent.getTimeMillis());
+        seqEvents.MessageTemplate = logEvent.getMessage().getFormattedMessage();
+
+        //If an exception was thrown, build the stack trace and pass it
         if (logEvent.getThrown() != null) {
             StringBuilder stack = new StringBuilder();
             var thrown = logEvent.getThrown();
             var stackTrace = thrown.getStackTrace();
-            stack.append(thrown + "\r\n");
+            stack.append(thrown).append("\r\n");
             for (int i = 1; i < stackTrace.length; i++)
-                stack.append("at " + stackTrace[i].toString() + "\r\n");
-            x.Exception = stack.toString();
+                stack.append("at ").append(stackTrace[i].toString()).append("\r\n");
+            seqEvents.Exception = stack.toString();
         }
 
-        x.Properties = kv;
-        x.Properties.put("MachineName", getHostname().toUpperCase());
-        x.Properties.put("ThreadId", logEvent.getThreadId());
-        x.Properties.put("MethodName", logEvent.getThreadName());
-        x.Properties.put("Class", logEvent.getLoggerFqcn());
-        x.Properties.put("LoggerName", logEvent.getLoggerName());
+        //If any properties were passed in config, add them and then add diagnostic info
+        seqEvents.Properties = this.Properties;
+        seqEvents.Properties.put("AppName", this.AppName);
+        seqEvents.Properties.put("MachineName", this.getHostname().toUpperCase());
+        seqEvents.Properties.put("ThreadId", logEvent.getThreadId());
+        seqEvents.Properties.put("MethodName", logEvent.getThreadName());
+        seqEvents.Properties.put("ClassName", logEvent.getLoggerFqcn());
+        seqEvents.Properties.put("ProcessName", logEvent.getLoggerName());
 
+        //Add any context mappings
         var context =logEvent.getContextData().toMap();
-        Iterator contextEntries = context.entrySet().iterator();
-        while (contextEntries.hasNext()) {
-            Map.Entry pair = (Map.Entry)contextEntries.next();
-            x.Properties.put(toPascalCase(pair.getKey().toString()), pair.getValue());
+        for (Map.Entry<String, String> pair : context.entrySet()) {
+
+            seqEvents.Properties.put(toPascalCase(pair.getKey()), pair.getValue());
         }
 
-        seqLog.Events.add(x);
-
-        return seqLog;
+        return new SeqLog(seqEvents);
     }
 
     private String getHostname() {
-        if (Host == null) {
+        if (this.Host == null) {
             try {
                 InetAddress addr = InetAddress.getLocalHost();
                 this.Host = addr.getHostName();
@@ -184,7 +199,7 @@ public class SeqAppender extends AbstractAppender {
                 this.Host = "localhost";
             }
         }
-        return Host;
+        return this.Host;
     }
 
     static String toPascalCase(String text){
@@ -210,15 +225,16 @@ public class SeqAppender extends AbstractAppender {
         return converted.toString();
     }
 
-    class SeqLog {
-        List<SeqEvents> Events;
+    @SuppressWarnings({"LocalCanBeFinal", "UnnecessaryThis"})
+    static class SeqLog {
+        final List<SeqEvents> Events = new ArrayList<>();
 
-        SeqLog() {
-            Events = new ArrayList<>();
+        SeqLog(SeqEvents events) {
+            this.Events.add(events);
         }
     }
 
-    class SeqEvents {
+    static class SeqEvents {
 
         Timestamp Timestamp;
         String MessageTemplate;

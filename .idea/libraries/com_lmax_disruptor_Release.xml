@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="com.lmax:disruptor:Release" type="repository">
+    <properties maven-id="com.lmax:disruptor:RELEASE" />
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/lib/disruptor-3.4.4.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

@@ -5,9 +5,9 @@
             <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
         </Console>
         <SeqAppender name="SeqAppender">
-            <SeqUrl name="Url">https://seq.domain.com</SeqUrl>>
-            <SeqApiKey name="ApiKey"></SeqApiKey>>
-            <AppName name="AppName">Test App</AppName>>
+            <SeqUrl name="Url">https://seq.domain.com</SeqUrl>
+            <SeqApiKey name="ApiKey"></SeqApiKey>
+            <AppName name="AppName">Test App</AppName>
             <PatternLayout pattern="%p: %m%n" charset="UTF-8"/>
         </SeqAppender>
     </Appenders>
