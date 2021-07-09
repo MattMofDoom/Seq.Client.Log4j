@@ -23,5 +23,6 @@
         <SOURCES />
       </library>
     </orderEntry>
+    <orderEntry type="library" name="org.apache.commons:commons-collections4:Release" level="project" />
   </component>
 </module>
