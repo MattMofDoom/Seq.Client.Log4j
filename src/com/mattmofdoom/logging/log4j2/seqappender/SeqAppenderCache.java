@@ -5,7 +5,7 @@ import org.apache.commons.collections4.MapIterator;
 import org.apache.commons.collections4.map.LRUMap;
 
 @SuppressWarnings({"UnnecessaryThis", "UnnecessaryFinalOnLocalVariableOrParameter", "BusyWait"})
-public class Cache<K, T> {
+public class SeqAppenderCache<K, T> {
 
     private final long timeToLive;
     private final LRUMap<K, cacheObject> cacheMap;
@@ -20,7 +20,7 @@ public class Cache<K, T> {
         }
     }
 
-    public Cache(final long timeToLive, final long timerInterval) {
+    public SeqAppenderCache(final long timeToLive, final long timerInterval) {
         this.timeToLive = timeToLive * 1000;
 
         this.cacheMap = new LRUMap<>();

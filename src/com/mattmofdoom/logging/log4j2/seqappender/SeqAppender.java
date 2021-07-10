@@ -29,7 +29,7 @@ public class SeqAppender extends AbstractAppender {
     @SuppressWarnings("FieldCanBeLocal")
     private int CacheTime;
     final Map<String, Object> Properties = new HashMap<>();
-    private static Cache<String, Object> Cache;
+    private static SeqAppenderCache<String, Object> Cache;
     private static  String CorrelationId;
 
     protected SeqAppender(String name, Filter filter,
@@ -39,12 +39,12 @@ public class SeqAppender extends AbstractAppender {
         this.ApiKey = seqApiKey;
         this.AppName = appName;
         if (cacheTime < 0) {
-            cacheTime = 10;
+            cacheTime = 600;
         }
 
         if (cacheTime > 0) {
             this.CacheTime = cacheTime;
-            Cache = new Cache<>(cacheTime, 5);
+            Cache = new SeqAppenderCache<>(cacheTime, 5);
             this.IsCache = true;
         }
 

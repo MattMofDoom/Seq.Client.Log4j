@@ -1,4 +1,4 @@
-import com.mattmofdoom.logging.log4j2.seqappender.Cache;
+import com.mattmofdoom.logging.log4j2.seqappender.SeqAppenderCache;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.junit.BeforeClass;
@@ -11,7 +11,7 @@ import java.util.UUID;
 @SuppressWarnings({"LocalCanBeFinal", "UnqualifiedStaticUsage", "UnnecessaryThis"})
 public class SeqAppenderTest {
     private static Logger Log;
-    private final Cache<String,Object> cache = new Cache<>(2,2);
+    private final SeqAppenderCache<String,Object> cache = new SeqAppenderCache<>(2,2);
 
     @BeforeClass
     public static void setUp() {
