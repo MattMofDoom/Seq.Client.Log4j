@@ -1,7 +1,8 @@
 package com.mattmofdoom.logging.log4j2.seqappender;
 
-import com.google.gson.Gson;
-import org.apache.commons.collections4.map.CaseInsensitiveMap;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.util.StdDateFormat;
 import org.apache.logging.log4j.core.Filter;
 import org.apache.logging.log4j.core.Layout;
 import org.apache.logging.log4j.core.LogEvent;
@@ -26,26 +27,34 @@ public class SeqAppender extends AbstractAppender {
     private final String ApiKey;
     private final String AppName;
     private boolean IsCache;
+    private final String CorrelationProperty;
+    private final boolean IncludeCorrelation;
     @SuppressWarnings("FieldCanBeLocal")
     private int CacheTime;
     final Map<String, Object> Properties = new HashMap<>();
     private static SeqAppenderCache<String, Object> Cache;
     private static  String CorrelationId;
 
+
     protected SeqAppender(String name, Filter filter,
-                          Layout<? extends Serializable> layout, String seqUrl, String seqApiKey, String appName, int cacheTime, Property[] properties) {
+                          Layout<? extends Serializable> layout, String seqUrl, String seqApiKey, String appName, int cacheTime, String correlationProperty, boolean includeCorrelation, Property[] properties) {
         super(name, filter, layout, true, properties);
         this.Url = seqUrl;
         this.ApiKey = seqApiKey;
         this.AppName = appName;
-        if (cacheTime < 0) {
-            cacheTime = 600;
-        }
+        this.CorrelationProperty = Objects.requireNonNullElse(correlationProperty, "correlationId");
+        this.IncludeCorrelation = includeCorrelation;
 
-        if (cacheTime > 0) {
-            this.CacheTime = cacheTime;
-            Cache = new SeqAppenderCache<>(cacheTime, 5);
-            this.IsCache = true;
+        if (this.IncludeCorrelation) {
+            if (cacheTime < 0) {
+                cacheTime = 600;
+            }
+
+            if (cacheTime > 0) {
+                this.CacheTime = cacheTime;
+                Cache = new SeqAppenderCache<>(cacheTime, 5);
+                this.IsCache = true;
+            }
         }
 
         for (Property property : properties) {
@@ -90,6 +99,12 @@ public class SeqAppender extends AbstractAppender {
         @PluginBuilderAttribute("CacheTime")
         private int cacheTime;
 
+        @PluginBuilderAttribute("CorrelationProperty")
+        private String correlationProperty;
+
+        @PluginBuilderAttribute("IncludeCorrelation")
+        private boolean includeCorrelation;
+
         public SeqAppenderBuilder setName(String value) {
             this.name = value;
             return this;
@@ -131,9 +146,19 @@ public class SeqAppender extends AbstractAppender {
             return this;
         }
 
+        public SeqAppenderBuilder setCorrelationProperty(String value) {
+            this.correlationProperty = value;
+            return this;
+        }
+
+        public SeqAppenderBuilder setIncludeCorrelation(boolean value) {
+            this.includeCorrelation = value;
+            return this;
+        }
+
         @Override
         public SeqAppender build() {
-            return new SeqAppender(this.name, this.filter, this.layout, this.seqUrl, this.seqApiKey, this.appName, this.cacheTime, this.properties);
+            return new SeqAppender(this.name, this.filter, this.layout, this.seqUrl, this.seqApiKey, this.appName, this.cacheTime, this.correlationProperty, this.includeCorrelation, this.properties);
         }
     }
 
@@ -143,9 +168,9 @@ public class SeqAppender extends AbstractAppender {
                                              @PluginElement("Filters") Filter filter, @PluginElement("IgnoreExceptions") Boolean ignoreExceptions,
                                              @PluginElement("Properties") Property[] properties, @PluginAttribute("seqUrl") String seqUrl,
                                              @PluginAttribute("seqApiKey") String seqApiKey, @PluginAttribute("appName") String appName,
-                                             @PluginAttribute("cacheTime") int cacheTime) {
+                                             @PluginAttribute("cacheTime") int cacheTime, @PluginAttribute("correlationProperty") String correlationProperty, @PluginAttribute("includeCorrelation") boolean includeCorrelation) {
 
-        return new SeqAppender(name, filter, layout, seqUrl, seqApiKey, appName, cacheTime, properties);
+        return new SeqAppender(name, filter, layout, seqUrl, seqApiKey, appName, cacheTime, correlationProperty, includeCorrelation, properties);
     }
 
     @Override
@@ -158,33 +183,34 @@ public class SeqAppender extends AbstractAppender {
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("X-Seq-ApiKey", this.ApiKey);
 
-            CaseInsensitiveMap<String,String> context = this.getMap(logEvent.getContextData().toMap());
-            var threadId = String.valueOf(logEvent.getThreadId());
-            if (context.containsKey("correlationId")) {
-                if (this.IsCache) {
-                    if (context.get("correlationId") != Cache.get(threadId)) {
-                        Cache.put(threadId, context.get("correlationId"));
-                } else {
-                        CorrelationId = context.get("correlationId");
-                    }
-                }
-            }
-            else {
-                if (this.IsCache) {
-                    if (Cache.get(threadId) == null) {
-                        Cache.put(threadId, UUID.randomUUID().toString());
-                    } else {
-                        if (CorrelationId == null) {
-                            CorrelationId = UUID.randomUUID().toString();
+            if (this.IncludeCorrelation) {
+                var context = logEvent.getContextData().toMap();
+                var threadId = String.valueOf(logEvent.getThreadId());
+                if (this.HasKey(context, this.CorrelationProperty)) {
+                    if (this.IsCache) {
+                        if (context.get(this.CorrelationProperty) != Cache.get(threadId)) {
+                            Cache.put(threadId, context.get(this.CorrelationProperty));
+                        } else {
+                            CorrelationId = context.get(this.CorrelationProperty);
                         }
                     }
+                } else {
+                    if (this.IsCache) {
+                        if (Cache.get(threadId) == null) {
+                            Cache.put(threadId, UUID.randomUUID().toString());
+                        } else {
+                            if (CorrelationId == null) {
+                                CorrelationId = UUID.randomUUID().toString();
+                            }
+                        }
 
+                    }
                 }
             }
 
-            Gson jsonObject = new Gson();
+            var jsonObject = new ObjectMapper().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).setDateFormat(new StdDateFormat().withColonInTimeZone(true));
             OutputStream os = conn.getOutputStream();
-            os.write(jsonObject.toJson(this.getLog(logEvent)).getBytes());
+            os.write(jsonObject.writeValueAsBytes(this.getLog(logEvent)));
             os.flush();
 
             if (conn.getResponseCode() != HttpURLConnection.HTTP_CREATED) {
@@ -226,18 +252,21 @@ public class SeqAppender extends AbstractAppender {
 
         //If any properties were passed in config, add them and then add diagnostic info
         seqEvents.Properties = this.Properties;
-        seqEvents.Properties.put("AppName", this.AppName);
+        if (this.AppName == null || this.AppName.equals(""))
+            seqEvents.Properties.put("AppName", logEvent.getLoggerName());
+        else
+            seqEvents.Properties.put("AppName", this.AppName);
         seqEvents.Properties.put("MachineName", this.getHostname().toUpperCase());
         seqEvents.Properties.put("ThreadId", logEvent.getThreadId());
         seqEvents.Properties.put("MethodName", logEvent.getThreadName());
-        seqEvents.Properties.put("ClassName", logEvent.getLoggerFqcn());
         seqEvents.Properties.put("ProcessName", logEvent.getLoggerName());
-        if (this.IsCache) {
-            seqEvents.Properties.put("CorrelationId", Cache.get(String.valueOf(logEvent.getThreadId())));
-        } else {
-            seqEvents.Properties.put("CorrelationId", CorrelationId);
+        if (this.IncludeCorrelation) {
+            if (this.IsCache) {
+                seqEvents.Properties.put("CorrelationId", Cache.get(String.valueOf(logEvent.getThreadId())));
+            } else {
+                seqEvents.Properties.put("CorrelationId", CorrelationId);
+            }
         }
-
         //Add any context mappings
         var context =logEvent.getContextData().toMap();
         for (Map.Entry<String, String> pair : context.entrySet()) {
@@ -248,13 +277,13 @@ public class SeqAppender extends AbstractAppender {
         return new SeqLog(seqEvents);
     }
 
-    private CaseInsensitiveMap<String, String> getMap(Map<String,String> value) {
-        var map = new CaseInsensitiveMap<String, String>();
-        for (Map.Entry<String,String> pair : value.entrySet()) {
-            map.put(pair.getKey(), pair.getValue());
+    private boolean HasKey(Map<String,String> entries, String value) {
+        for (Map.Entry<String, String> pair : entries.entrySet()) {
+            if (pair.getKey().equalsIgnoreCase(value))
+                return true;
         }
 
-        return map;
+        return false;
     }
 
     private String getHostname() {
@@ -293,24 +322,24 @@ public class SeqAppender extends AbstractAppender {
     }
 
     @SuppressWarnings({"LocalCanBeFinal", "UnnecessaryThis"})
-    static class SeqLog {
-        final List<SeqEvents> Events = new ArrayList<>();
+    public static class SeqLog {
+        public final List<SeqEvents> Events = new ArrayList<>();
 
-        SeqLog(SeqEvents events) {
+        public SeqLog(SeqEvents events) {
             this.Events.add(events);
         }
     }
 
-    static class SeqEvents {
+    public static class SeqEvents {
 
-        Timestamp Timestamp;
-        String MessageTemplate;
-        String Level;
-        String Exception;
-        String EventId;
-        String Message;
+        public Timestamp Timestamp;
+        public String MessageTemplate;
+        public String Level;
+        public String Exception;
+        public String EventId;
+        public String Message;
 
-        Map<String, Object> Properties = new Hashtable<>();
+        public Map<String, Object> Properties = new Hashtable<>();
 
         SeqEvents() {
         }

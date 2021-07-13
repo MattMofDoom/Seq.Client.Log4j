@@ -9,6 +9,8 @@
             <SeqApiKey name="ApiKey"></SeqApiKey>
             <AppName name="AppName">Test App</AppName>
             <CacheTime>10</CacheTime>
+            <CorrelationProperty>CorrelationId</CorrelationProperty>
+            <IncludeCorrelation>true</IncludeCorrelation>
         </SeqAppender>
     </Appenders>
     <Loggers>

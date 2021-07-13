@@ -1,14 +1,15 @@
 package com.mattmofdoom.logging.log4j2.seqappender;
 
 import java.util.ArrayList;
-import org.apache.commons.collections4.MapIterator;
-import org.apache.commons.collections4.map.LRUMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @SuppressWarnings({"UnnecessaryThis", "UnnecessaryFinalOnLocalVariableOrParameter", "BusyWait"})
 public class SeqAppenderCache<K, T> {
 
     private final long timeToLive;
-    private final LRUMap<K, cacheObject> cacheMap;
+    private final ConcurrentHashMap<K, cacheObject> cacheMap;
 
     @SuppressWarnings("UnnecessaryFinalOnLocalVariableOrParameter")
     protected class cacheObject {
@@ -23,7 +24,7 @@ public class SeqAppenderCache<K, T> {
     public SeqAppenderCache(final long timeToLive, final long timerInterval) {
         this.timeToLive = timeToLive * 1000;
 
-        this.cacheMap = new LRUMap<>();
+        this.cacheMap = new ConcurrentHashMap<>();
 
         if (timeToLive > 0 && timerInterval > 0) {
 
@@ -43,13 +44,10 @@ public class SeqAppenderCache<K, T> {
     }
 
     public void put(final K key, final T value) {
-        synchronized (this.cacheMap) {
             this.cacheMap.put(key, new cacheObject(value));
-        }
     }
 
     public T get(final K key) {
-        synchronized (this.cacheMap) {
             final cacheObject c = this.cacheMap.get(key);
 
             if (c == null)
@@ -58,20 +56,15 @@ public class SeqAppenderCache<K, T> {
                 c.lastAccessed = System.currentTimeMillis();
                 return c.value;
             }
-        }
     }
 
     public void remove(final K key) {
-        synchronized (this.cacheMap) {
-            this.cacheMap.remove(key);
-        }
+        this.cacheMap.remove(key);
     }
 
     @SuppressWarnings("unused")
     public int size() {
-        synchronized (this.cacheMap) {
-            return this.cacheMap.size();
-        }
+        return this.cacheMap.size();
     }
 
     public void cleanup() {
@@ -79,27 +72,23 @@ public class SeqAppenderCache<K, T> {
         final long now = System.currentTimeMillis();
         final ArrayList<K> deleteKey;
 
-        synchronized (this.cacheMap) {
-            final MapIterator<K, cacheObject> itr = this.cacheMap.mapIterator();
+        final Iterator<Map.Entry<K, cacheObject>> itr = this.cacheMap.entrySet().iterator();
 
-            deleteKey = new ArrayList<>((this.cacheMap.size() / 2) + 1);
-            K key;
-            cacheObject c;
+        deleteKey = new ArrayList<>((this.cacheMap.size() / 2) + 1);
 
-            while (itr.hasNext()) {
-                key = itr.next();
-                c = itr.getValue();
+        while (itr.hasNext()) {
+            final var entry = itr.next();
+            final var k = entry.getKey();
+            final var c = entry.getValue();
 
-                if (c != null && (now > (this.timeToLive + c.lastAccessed))) {
-                    deleteKey.add(key);
-                }
+            if (c != null && (now > (this.timeToLive + c.lastAccessed))) {
+                deleteKey.add(k);
             }
         }
 
+
         for (final K key : deleteKey) {
-            synchronized (this.cacheMap) {
-                this.cacheMap.remove(key);
-            }
+            this.cacheMap.remove(key);
 
             Thread.yield();
         }
