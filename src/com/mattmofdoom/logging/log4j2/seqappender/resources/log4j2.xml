@@ -11,6 +11,7 @@
             <CacheTime>600</CacheTime>
             <CorrelationProperty>CorrelationId</CorrelationProperty>
             <IncludeCorrelation>true</IncludeCorrelation>
+            <Property name="Example">Example Property</Property>
         </SeqAppender>
     </Appenders>
     <Loggers>

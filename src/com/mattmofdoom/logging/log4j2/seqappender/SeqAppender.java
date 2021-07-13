@@ -270,8 +270,8 @@ public class SeqAppender extends AbstractAppender {
         //Add any context mappings
         var context =logEvent.getContextData().toMap();
         for (Map.Entry<String, String> pair : context.entrySet()) {
-            if (!pair.getKey().equalsIgnoreCase("correlationid"))
-            seqEvents.Properties.put(toPascalCase(pair.getKey()), pair.getValue());
+            if (!pair.getKey().equalsIgnoreCase(this.CorrelationProperty))
+                seqEvents.Properties.put(toPascalCase(pair.getKey()), pair.getValue());
         }
 
         return new SeqLog(seqEvents);
