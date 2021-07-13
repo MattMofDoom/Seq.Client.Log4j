@@ -8,7 +8,7 @@
             <SeqUrl name="Url">https://seq.domain.com</SeqUrl>
             <SeqApiKey name="ApiKey"></SeqApiKey>
             <AppName name="AppName">Test App</AppName>
-            <CacheTime>10</CacheTime>
+            <CacheTime>600</CacheTime>
             <CorrelationProperty>CorrelationId</CorrelationProperty>
             <IncludeCorrelation>true</IncludeCorrelation>
         </SeqAppender>
