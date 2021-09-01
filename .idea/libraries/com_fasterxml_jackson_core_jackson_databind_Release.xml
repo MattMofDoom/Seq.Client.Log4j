@@ -2,9 +2,9 @@
   <library name="com.fasterxml.jackson.core:jackson-databind:Release" type="repository">
     <properties maven-id="com.fasterxml.jackson.core:jackson-databind:RELEASE" />
     <CLASSES>
-      <root url="jar://$PROJECT_DIR$/lib/jackson-databind-2.12.4.jar!/" />
-      <root url="jar://$PROJECT_DIR$/lib/jackson-annotations-2.12.4.jar!/" />
-      <root url="jar://$PROJECT_DIR$/lib/jackson-core-2.12.4.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/jackson-databind-2.13.0-rc2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/jackson-annotations-2.13.0-rc2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/jackson-core-2.13.0-rc2.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />
